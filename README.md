@@ -8,20 +8,14 @@ By default in Obsidian, pressing `Cmd/Ctrl+W` on a pinned tab **unpins** it inst
 
 ## Solution
 
-This plugin adds a new command: **"Close current tab (skip pinned)"**
+Just install and enable — no configuration needed.
+
+This plugin patches the built-in "Close current tab" command so that:
 
 - If the active tab is **not pinned** → closes it (same as default)
 - If the active tab is **pinned** → does nothing (tab stays pinned)
 
-## Setup
-
-After installing the plugin:
-
-1. Go to **Settings → Hotkeys**
-2. Search for `Close current tab` (the built-in command) and **remove** the `Cmd/Ctrl+W` binding
-3. Search for `Pin Tab Guard: Close current tab (skip pinned)` and **assign** `Cmd/Ctrl+W` to it
-
-That's it! Now `Cmd/Ctrl+W` will never unpin your pinned tabs.
+Disabling the plugin restores the original behavior.
 
 ## Installation
 
