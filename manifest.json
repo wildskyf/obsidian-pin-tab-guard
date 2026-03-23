@@ -1,0 +1,10 @@
+{
+	"id": "pin-tab-guard",
+	"name": "Pin Tab Guard",
+	"version": "1.0.0",
+	"minAppVersion": "1.0.0",
+	"description": "Prevents Cmd/Ctrl+W from unpinning pinned tabs. Provides a 'Close current tab (skip pinned)' command.",
+	"author": "Wildsky",
+	"authorUrl": "https://github.com/wildskyf",
+	"isDesktopOnly": false
+}
