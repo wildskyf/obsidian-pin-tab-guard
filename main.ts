@@ -11,11 +11,20 @@ interface SavedPatch {
 	original: (() => void) | ((checking: boolean) => boolean | void);
 }
 
+type PrototypeMethods = Record<string, (this: WorkspaceLeaf, ...args: never[]) => unknown>;
+
 const GUARDED_COMMANDS = [
 	"workspace:close",
 	"workspace:close-others",
 	"workspace:close-tab-group",
 ];
+
+function isLeafPinned(leaf: WorkspaceLeaf): boolean {
+	return (
+		leaf.getViewState().pinned ||
+		(leaf as unknown as Record<string, unknown>).pinned === true
+	);
+}
 
 export default class PinTabGuardPlugin extends Plugin {
 	private savedPatches: SavedPatch[] = [];
@@ -41,13 +50,6 @@ export default class PinTabGuardPlugin extends Plugin {
 		this.savedPatches = [];
 	}
 
-	private isLeafPinned(leaf: WorkspaceLeaf): boolean {
-		return (
-			leaf.getViewState().pinned ||
-			(leaf as unknown as Record<string, unknown>).pinned === true
-		);
-	}
-
 	private getCommand(id: string): CommandEntry | null {
 		const commands = (this.app as unknown as Record<string, unknown>)
 			.commands as { commands: Record<string, CommandEntry> } | undefined;
@@ -59,25 +61,26 @@ export default class PinTabGuardPlugin extends Plugin {
 	 * from being detached or unpinned.
 	 */
 	private executeWithGuard(fn: () => void): void {
-		const origDetach = WorkspaceLeaf.prototype.detach;
-		const origSetPinned = WorkspaceLeaf.prototype.setPinned;
-		const self = this;
+		const proto = WorkspaceLeaf.prototype as unknown as PrototypeMethods;
+		const origDetach = proto["detach"];
+		const origSetPinned = proto["setPinned"];
 
-		WorkspaceLeaf.prototype.detach = function (this: WorkspaceLeaf) {
-			if (self.isLeafPinned(this)) return;
+		proto["detach"] = function (this: WorkspaceLeaf) {
+			if (isLeafPinned(this)) return;
 			origDetach.call(this);
 		};
 
-		WorkspaceLeaf.prototype.setPinned = function (this: WorkspaceLeaf, pinned: boolean) {
-			if (!pinned && self.isLeafPinned(this)) return;
-			origSetPinned.call(this, pinned);
+		proto["setPinned"] = function (this: WorkspaceLeaf, ...args: never[]) {
+			const pinned = args[0] as unknown as boolean;
+			if (!pinned && isLeafPinned(this)) return;
+			origSetPinned.call(this, ...args);
 		};
 
 		try {
 			fn();
 		} finally {
-			WorkspaceLeaf.prototype.detach = origDetach;
-			WorkspaceLeaf.prototype.setPinned = origSetPinned;
+			proto["detach"] = origDetach;
+			proto["setPinned"] = origSetPinned;
 		}
 	}
 
