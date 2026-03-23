@@ -1,23 +1,32 @@
 # Pin Tab Guard
 
-An [Obsidian](https://obsidian.md) plugin that prevents `Cmd/Ctrl+W` from unpinning your pinned tabs.
+An [Obsidian](https://obsidian.md) plugin that protects your pinned tabs from being accidentally closed or unpinned.
 
 ## Problem
 
-By default in Obsidian, pressing `Cmd/Ctrl+W` on a pinned tab **unpins** it instead of leaving it alone. This can be frustrating if you use pinned tabs to keep important notes always open.
+By default in Obsidian, pinned tabs can be unpinned or closed by:
+
+- Pressing `Cmd/Ctrl+W` on a pinned tab (unpins it)
+- "Close all other tabs" (closes pinned tabs too)
+- "Close tab group" (closes pinned tabs too)
+
+This can be frustrating if you use pinned tabs to keep important notes always open.
 
 ## Solution
 
 Just install and enable — no configuration needed.
 
-This plugin patches the built-in "Close current tab" command so that:
+This plugin guards the following built-in commands:
 
-- If the active tab is **not pinned** → closes it (same as default)
-- If the active tab is **pinned** → does nothing (tab stays pinned)
+| Command | Guarded behavior |
+|---------|-----------------|
+| **Close current tab** (`Cmd/Ctrl+W`) | Pinned tab → does nothing |
+| **Close all other tabs** | Only closes non-pinned tabs |
+| **Close tab group** | Only closes non-pinned tabs; if all tabs are pinned, does nothing |
 
-Disabling the plugin restores the original behavior.
+Disabling the plugin restores all original behaviors.
 
-> **Note:** This plugin only guards the "Close current tab" **command** (triggered by `Cmd/Ctrl+W` or the command palette). Closing a pinned tab via the right-click context menu bypasses the command system and is not affected.
+> **Note:** This plugin guards commands triggered by hotkeys and the command palette. Closing a tab via the right-click context menu bypasses the command system and is not affected.
 
 ## Installation
 
