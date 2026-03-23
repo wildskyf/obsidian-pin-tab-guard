@@ -14,7 +14,7 @@ interface SavedPatch {
 export default class PinTabGuardPlugin extends Plugin {
 	private savedPatches: SavedPatch[] = [];
 
-	async onload() {
+	onload() {
 		this.app.workspace.onLayoutReady(() => {
 			this.patchClose();
 			this.patchCloseOthers();
@@ -64,7 +64,7 @@ export default class PinTabGuardPlugin extends Plugin {
 			const orig = cmd.checkCallback;
 			this.savedPatches.push({ commandId: "workspace:close", type: "checkCallback", original: orig });
 			cmd.checkCallback = (checking: boolean) => {
-				const leaf = this.app.workspace.getMostRecentLeaf();
+				const leaf = this.app.workspace.activeLeaf;
 				if (leaf && this.isLeafPinned(leaf)) {
 					if (checking) return true;
 					return;
@@ -75,7 +75,7 @@ export default class PinTabGuardPlugin extends Plugin {
 			const orig = cmd.callback;
 			this.savedPatches.push({ commandId: "workspace:close", type: "callback", original: orig });
 			cmd.callback = () => {
-				const leaf = this.app.workspace.getMostRecentLeaf();
+				const leaf = this.app.workspace.activeLeaf;
 				if (leaf && this.isLeafPinned(leaf)) return;
 				orig();
 			};
@@ -108,7 +108,7 @@ export default class PinTabGuardPlugin extends Plugin {
 			const orig = cmd.checkCallback;
 			this.savedPatches.push({ commandId: "workspace:close-others", type: "checkCallback", original: orig });
 			cmd.checkCallback = (checking: boolean) => {
-				const activeLeaf = this.app.workspace.getMostRecentLeaf();
+				const activeLeaf = this.app.workspace.activeLeaf;
 				if (!activeLeaf) return orig(checking);
 
 				if (checking) return hasCloseableOthers(activeLeaf);
@@ -118,7 +118,7 @@ export default class PinTabGuardPlugin extends Plugin {
 			const orig = cmd.callback;
 			this.savedPatches.push({ commandId: "workspace:close-others", type: "callback", original: orig });
 			cmd.callback = () => {
-				const activeLeaf = this.app.workspace.getMostRecentLeaf();
+				const activeLeaf = this.app.workspace.activeLeaf;
 				if (!activeLeaf) return orig();
 				closeOthersGuarded(activeLeaf);
 			};
@@ -137,7 +137,7 @@ export default class PinTabGuardPlugin extends Plugin {
 			const orig = cmd.checkCallback;
 			this.savedPatches.push({ commandId: "workspace:close-tab-group", type: "checkCallback", original: orig });
 			cmd.checkCallback = (checking: boolean) => {
-				const activeLeaf = this.app.workspace.getMostRecentLeaf();
+				const activeLeaf = this.app.workspace.activeLeaf;
 				if (!activeLeaf) return orig(checking);
 
 				const siblings = this.getSiblingLeaves(activeLeaf);
@@ -158,7 +158,7 @@ export default class PinTabGuardPlugin extends Plugin {
 			const orig = cmd.callback;
 			this.savedPatches.push({ commandId: "workspace:close-tab-group", type: "callback", original: orig });
 			cmd.callback = () => {
-				const activeLeaf = this.app.workspace.getMostRecentLeaf();
+				const activeLeaf = this.app.workspace.activeLeaf;
 				if (!activeLeaf) return orig();
 
 				const siblings = this.getSiblingLeaves(activeLeaf);
