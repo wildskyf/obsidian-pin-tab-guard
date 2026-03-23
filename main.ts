@@ -11,14 +11,20 @@ interface SavedPatch {
 	original: (() => void) | ((checking: boolean) => boolean | void);
 }
 
+const GUARDED_COMMANDS = [
+	"workspace:close",
+	"workspace:close-others",
+	"workspace:close-tab-group",
+];
+
 export default class PinTabGuardPlugin extends Plugin {
 	private savedPatches: SavedPatch[] = [];
 
 	onload() {
 		this.app.workspace.onLayoutReady(() => {
-			this.patchClose();
-			this.patchCloseOthers();
-			this.patchCloseTabGroup();
+			for (const id of GUARDED_COMMANDS) {
+				this.patchCommand(id);
+			}
 		});
 	}
 
@@ -48,129 +54,49 @@ export default class PinTabGuardPlugin extends Plugin {
 		return commands?.commands?.[id] ?? null;
 	}
 
-	private getSiblingLeaves(leaf: WorkspaceLeaf): WorkspaceLeaf[] | null {
-		const parent = leaf.parent as unknown as { children?: WorkspaceLeaf[] } | undefined;
-		if (!parent?.children) return null;
-		return [...parent.children];
-	}
+	/**
+	 * Execute a function while temporarily preventing pinned leaves
+	 * from being detached or unpinned.
+	 */
+	private executeWithGuard(fn: () => void): void {
+		const origDetach = WorkspaceLeaf.prototype.detach;
+		const origSetPinned = WorkspaceLeaf.prototype.setPinned;
+		const self = this;
 
-	// ── workspace:close ──────────────────────────────────────────────
-	// If the active tab is pinned, do nothing (consume the hotkey).
-	private patchClose() {
-		const cmd = this.getCommand("workspace:close");
-		if (!cmd) return;
+		WorkspaceLeaf.prototype.detach = function (this: WorkspaceLeaf) {
+			if (self.isLeafPinned(this)) return;
+			origDetach.call(this);
+		};
 
-		if (cmd.checkCallback) {
-			const orig = cmd.checkCallback;
-			this.savedPatches.push({ commandId: "workspace:close", type: "checkCallback", original: orig });
-			cmd.checkCallback = (checking: boolean) => {
-				const leaf = this.app.workspace.activeLeaf;
-				if (leaf && this.isLeafPinned(leaf)) {
-					if (checking) return true;
-					return;
-				}
-				return orig(checking);
-			};
-		} else if (cmd.callback) {
-			const orig = cmd.callback;
-			this.savedPatches.push({ commandId: "workspace:close", type: "callback", original: orig });
-			cmd.callback = () => {
-				const leaf = this.app.workspace.activeLeaf;
-				if (leaf && this.isLeafPinned(leaf)) return;
-				orig();
-			};
+		WorkspaceLeaf.prototype.setPinned = function (this: WorkspaceLeaf, pinned: boolean) {
+			if (!pinned && self.isLeafPinned(this)) return;
+			origSetPinned.call(this, pinned);
+		};
+
+		try {
+			fn();
+		} finally {
+			WorkspaceLeaf.prototype.detach = origDetach;
+			WorkspaceLeaf.prototype.setPinned = origSetPinned;
 		}
 	}
 
-	// ── workspace:close-others ───────────────────────────────────────
-	// Close other tabs in the same group, but keep pinned ones.
-	private patchCloseOthers() {
-		const cmd = this.getCommand("workspace:close-others");
-		if (!cmd) return;
-
-		const closeOthersGuarded = (activeLeaf: WorkspaceLeaf) => {
-			const siblings = this.getSiblingLeaves(activeLeaf);
-			if (!siblings) return;
-			for (const leaf of siblings) {
-				if (leaf === activeLeaf) continue;
-				if (this.isLeafPinned(leaf)) continue;
-				leaf.detach();
-			}
-		};
-
-		const hasCloseableOthers = (activeLeaf: WorkspaceLeaf): boolean => {
-			const siblings = this.getSiblingLeaves(activeLeaf);
-			if (!siblings) return false;
-			return siblings.some((l) => l !== activeLeaf && !this.isLeafPinned(l));
-		};
-
-		if (cmd.checkCallback) {
-			const orig = cmd.checkCallback;
-			this.savedPatches.push({ commandId: "workspace:close-others", type: "checkCallback", original: orig });
-			cmd.checkCallback = (checking: boolean) => {
-				const activeLeaf = this.app.workspace.activeLeaf;
-				if (!activeLeaf) return orig(checking);
-
-				if (checking) return hasCloseableOthers(activeLeaf);
-				closeOthersGuarded(activeLeaf);
-			};
-		} else if (cmd.callback) {
-			const orig = cmd.callback;
-			this.savedPatches.push({ commandId: "workspace:close-others", type: "callback", original: orig });
-			cmd.callback = () => {
-				const activeLeaf = this.app.workspace.activeLeaf;
-				if (!activeLeaf) return orig();
-				closeOthersGuarded(activeLeaf);
-			};
-		}
-	}
-
-	// ── workspace:close-tab-group ────────────────────────────────────
-	// Close all tabs in the group, but keep pinned ones.
-	// If no pinned tabs exist, fall through to original (removes the group entirely).
-	// If all tabs are pinned, do nothing.
-	private patchCloseTabGroup() {
-		const cmd = this.getCommand("workspace:close-tab-group");
+	private patchCommand(commandId: string): void {
+		const cmd = this.getCommand(commandId);
 		if (!cmd) return;
 
 		if (cmd.checkCallback) {
 			const orig = cmd.checkCallback;
-			this.savedPatches.push({ commandId: "workspace:close-tab-group", type: "checkCallback", original: orig });
+			this.savedPatches.push({ commandId, type: "checkCallback", original: orig });
 			cmd.checkCallback = (checking: boolean) => {
-				const activeLeaf = this.app.workspace.activeLeaf;
-				if (!activeLeaf) return orig(checking);
-
-				const siblings = this.getSiblingLeaves(activeLeaf);
-				if (!siblings) return orig(checking);
-
-				const hasPinned = siblings.some((l) => this.isLeafPinned(l));
-				const hasUnpinned = siblings.some((l) => !this.isLeafPinned(l));
-
-				if (!hasPinned) return orig(checking);
-				if (checking) return hasUnpinned;
-
-				for (const leaf of siblings) {
-					if (this.isLeafPinned(leaf)) continue;
-					leaf.detach();
-				}
+				if (checking) return orig(true);
+				this.executeWithGuard(() => orig(false));
 			};
 		} else if (cmd.callback) {
 			const orig = cmd.callback;
-			this.savedPatches.push({ commandId: "workspace:close-tab-group", type: "callback", original: orig });
+			this.savedPatches.push({ commandId, type: "callback", original: orig });
 			cmd.callback = () => {
-				const activeLeaf = this.app.workspace.activeLeaf;
-				if (!activeLeaf) return orig();
-
-				const siblings = this.getSiblingLeaves(activeLeaf);
-				if (!siblings) return orig();
-
-				const hasPinned = siblings.some((l) => this.isLeafPinned(l));
-				if (!hasPinned) return orig();
-
-				for (const leaf of siblings) {
-					if (this.isLeafPinned(leaf)) continue;
-					leaf.detach();
-				}
+				this.executeWithGuard(orig);
 			};
 		}
 	}
