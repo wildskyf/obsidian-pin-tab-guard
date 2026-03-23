@@ -17,6 +17,8 @@ This plugin patches the built-in "Close current tab" command so that:
 
 Disabling the plugin restores the original behavior.
 
+> **Note:** This plugin only guards the "Close current tab" **command** (triggered by `Cmd/Ctrl+W` or the command palette). Closing a pinned tab via the right-click context menu bypasses the command system and is not affected.
+
 ## Installation
 
 ### From Community Plugins

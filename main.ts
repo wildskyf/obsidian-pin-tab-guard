@@ -1,4 +1,4 @@
-import { Plugin } from "obsidian";
+import { Plugin, WorkspaceLeaf } from "obsidian";
 
 interface CommandEntry {
 	callback?: () => void;
@@ -19,6 +19,13 @@ export default class PinTabGuardPlugin extends Plugin {
 		this.unpatchCloseCommand();
 	}
 
+	private isLeafPinned(leaf: WorkspaceLeaf): boolean {
+		return (
+			leaf.getViewState().pinned ||
+			(leaf as unknown as Record<string, unknown>).pinned === true
+		);
+	}
+
 	private patchCloseCommand() {
 		const closeCmd = this.getCloseCommand();
 		if (!closeCmd) return;
@@ -27,7 +34,7 @@ export default class PinTabGuardPlugin extends Plugin {
 			this.originalCheckCallback = closeCmd.checkCallback;
 			closeCmd.checkCallback = (checking: boolean) => {
 				const leaf = this.app.workspace.getMostRecentLeaf();
-				if (leaf?.getViewState().pinned) {
+				if (leaf && this.isLeafPinned(leaf)) {
 					// Return true when checking to consume the hotkey; do nothing when executing
 					if (checking) return true;
 					return;
@@ -38,7 +45,7 @@ export default class PinTabGuardPlugin extends Plugin {
 			this.originalCallback = closeCmd.callback;
 			closeCmd.callback = () => {
 				const leaf = this.app.workspace.getMostRecentLeaf();
-				if (leaf?.getViewState().pinned) return;
+				if (leaf && this.isLeafPinned(leaf)) return;
 				this.originalCallback!();
 			};
 		}
